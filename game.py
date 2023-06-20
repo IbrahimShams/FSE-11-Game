@@ -1,17 +1,10 @@
-#TO DO
-#make robot_platforms and robot_actual_hitbox in robot hitboxes
-#dont do robot health bars yet, do level transitions
-#block count collisions with map degenerator, shooter, and bomber
-#finish the levelling system
-#player block count display
-#player health (blocks, health, and lava)
-
-from pygame import *
+from pygame import * #importing modules
 from math import *
 from random import *
 
-font.init()
+font.init() #font intitialization
 
+#general setup variables
 width,height=1150,697
 screen=display.set_mode((width,height))
 display.set_caption("Vicioux Robotix")
@@ -24,29 +17,44 @@ YELLOW=(255,255,0)
 WHITE=(255,255,255)
 myClock=time.Clock()
 running=True
+bg_colour=(randint(50,205),randint(50,205),randint(50,205)) #bg colour random
+omx,omy=0,0 #old mouse x mouse y
+rect_list=[Rect(0,500,50,50)] #list of all the blocks (rects) player places
+
+#Image paths, counters, and image variables
 lava_counter,robot_counter=0,0
 block=image.load("block2.png").convert()
-rect_list=[Rect(0,500,50,50)]
-omx,omy=0,0
+block_count_icon=image.load("block_count_icon.png")
+block_count_icon=transform.scale(block_count_icon,(60,60)).convert_alpha()
+robot_platform=image.load("robot_platform.png").convert_alpha()
 lavaImgs=[image.load("lava/lava00"+f"{i}"+".png").convert() for i in range(6)]
 lava_background=Rect(0,597,1150,100)
-no_spawn_region=Rect(0,325,200,175)
+for img in lavaImgs:
+    img.set_colorkey(BLACK)
+
+#player and move variables
 jumpPower=-7
 move_list=["no jump","right",0.07,False]
-dJump,facing,img_speed,atckHitbox=0,1,2,3
-gravity=0.3
-X,Y,W,H=0,1,2,3
-start_timer,start_timer1,start_timer2=time.get_ticks(),time.get_ticks(),time.get_ticks()
-SPEED=15
-begin_timer=False
-begin=True
-comicFont=font.SysFont("Comic Sans MS",40)
+dJump,facing,img_speed,atckHitbox=0,1,2,3 #double jump, facing direction for player, image speed for animation, and attack hitbox variables
+gravity=0.3 #gravity
+X,Y,W,H=0,1,2,3 #for player
+v=[0,0,697] #X,Y velocity for player
+p=Rect(0,300,40,75) #player hitbox rect
+p_list=[0,0] #player animation list (row, column for 2d list of animations. row for action, column for frame)
 
-v=[0,0,697]
-p=Rect(0,300,40,75)
-p_list=[0,0]
-objects=[lava_background,p]
-bullets=[]
+#robot variables
+SPEED=15 #speed of bullet
+begin_timer=False #timing robot
+begin=True #a variable to control timer, when to start and when to finish
+no_spawn_region=Rect(0,325,200,175) #robots cant spawn in this rect
+objects=[lava_background,p] #the objects you cant draw on
+bullets=[] #bullets 2d list. includes a list for each bullet with x,y,vx,vy
+
+#level and block variables
+level=10
+blocks=[15,15] #the 2nd one is your maximum amount of blocks you can place and your first one is the amount of blocks you have with you minus the ones you have placed.
+blockFont=font.SysFont("Comic Sans MS",40) #fonts for block and level
+levelFont=font.SysFont("Arial",250)
 
 def flipPics(lst):
     return [transform.flip(image,True,False) for image in lst]
@@ -76,16 +84,20 @@ robot_pics.append(addPics("robots","tile",104,111)) #bomber robot pics right
 robot_pics.append(flipPics(robot_pics[2])) #bomber robot pics left
 robot_pics.append(addPics("robots","tile",48,55)) #map degenerator robot pics right
 robot_pics.append(flipPics(robot_pics[4])) #map degenerator robot pics left
-robot_pics.append(addPics("robots","tile",168,175)) #floater robot pics right
-robot_pics.append(flipPics(robot_pics[6])) #floater robot pics left
 robot_pics.append(addPics("robots","tile",176,183)) #laser robot pics right
-robot_pics.append(flipPics(robot_pics[8])) #laser robot pics left
+robot_pics.append(flipPics(robot_pics[6])) #laser robot pics left
 
-possibleRobots=["shooter","bomber","map degenerator"] #laser, floater
+possibleRobots=["shooter","bomber","map degenerator","laser"]
 robots=[choice(possibleRobots)]
-level=1
-blocks=[20,20]
 robot_timers=[time.get_ticks()]
+
+poof_pics=addPics("poof","tile",0,7)
+poof_list=[]
+
+def checkDeath():
+    global running
+    if p[Y]>=600 or blocks[1]==0:
+        running=False
 
 def roundIt(num,round_num):
     n=0
@@ -111,7 +123,8 @@ def destroyMap(map):
     if len(map)>0:
         block=choice(map)
         map.remove(block)
-        blocks[1]-=1
+        if blocks[1]>0:
+            blocks[1]-=1
     blocks[0]=blocks[1]-len(map)
 
 def mapDestroyRobot(start,waiting):
@@ -132,23 +145,25 @@ def shooterRobot(start,waiting,x1,y1,x2,y2):
         shoot(x1,y1,x2,y2)
         robot_timers[start]=current
     for b in bullets[:]:
-        b[0]+=b[2]
-        b[1]+=b[3]
-        if b[0]>1150 or b[0]<0 or b[1]<0 or b[1]>697:
+        b[X]+=b[2]
+        b[Y]+=b[3]
+        if b[X]>1150 or b[X]<0 or b[Y]<0 or b[Y]>697:
             bullets.remove(b)
 
-def robotDeath(hitboxes,robots,timers):
+def robotDeath(hitboxes,robots,timers,poof):
     global level,begin_timer,begin
     if move_list[atckHitbox]:
-        index=move_list[atckHitbox].collidelist(robot_hitboxes)
+        index=move_list[atckHitbox].collidelist(hitboxes)
         if index!=-1:
+            poof.append([hitboxes[index][X],hitboxes[index][Y],0])
             objects.remove(hitboxes[index])
             del hitboxes[index]
             del robots[index]
             del timers[index]
-            blocks[1]+=20
+            blocks[1]+=15
             blocks[0]=blocks[1]-len(rect_list)
     if not robots:
+        bullets.clear()
         if begin:
             begin_timer=time.get_ticks()
             begin=False
@@ -158,61 +173,83 @@ def robotDeath(hitboxes,robots,timers):
             p[Y]=425
             level=newLevel(level)
 
-def robots_function(robot_counter):
+    for i in range(len(poof)):
+        if poof[i]:
+            if poof[i][2]<7:
+                poof[i][2]+=0.3
+                screen.blit(poof_pics[int(poof[i][2])],(poof[i][X],poof[i][Y]))
+        else:
+            del poof[i]
+            if len(poof)==0:
+                break
+
+def robotsFunction(robot_counter):
     robot_counter=(robot_counter+0.2)%7
     for i in range(len(robots)):
+        screen.blit(robot_platform,(robot_hitboxes[i][X]-25,robot_hitboxes[i][Y]+50))
         if robots[i]=="shooter":
-            shooterRobot(i,3000,robot_hitboxes[i][0]+25,robot_hitboxes[i][1]+25,p[0]+20,p[1]+37)
-            if (p[0]+12)>robot_hitboxes[i][0]+30:
-                screen.blit(robot_pics[0][int(robot_counter)],(robot_hitboxes[i][0]-20,robot_hitboxes[i][1]-20))
+            shooterRobot(i,randint(1500,5000),robot_hitboxes[i][X]+25,robot_hitboxes[i][Y]+25,p[X]+20,p[Y]+37)
+            if (p[X]+12)>robot_hitboxes[i][X]+30:
+                screen.blit(robot_pics[0][int(robot_counter)],(robot_hitboxes[i][X]-20,robot_hitboxes[i][Y]-20))
             else:
-                screen.blit(robot_pics[1][int(robot_counter)],(robot_hitboxes[i][0]-10,robot_hitboxes[i][1]-20))
+                screen.blit(robot_pics[1][int(robot_counter)],(robot_hitboxes[i][X]-10,robot_hitboxes[i][Y]-20))
         elif robots[i]=="map degenerator":
-            mapDestroyRobot(i,5000)
-            if (p[0]+12)>robot_hitboxes[i][0]+30:
-                screen.blit(robot_pics[4][int(robot_counter)],(robot_hitboxes[i][0]-10,robot_hitboxes[i][1]-20))
+            mapDestroyRobot(i,randint(3000,6000))
+            if (p[X]+12)>robot_hitboxes[i][X]+30:
+                screen.blit(robot_pics[4][int(robot_counter)],(robot_hitboxes[i][X]-10,robot_hitboxes[i][Y]-20))
             else:
-                screen.blit(robot_pics[5][int(robot_counter)],(robot_hitboxes[i][0]-10,robot_hitboxes[i][1]-20))
+                screen.blit(robot_pics[5][int(robot_counter)],(robot_hitboxes[i][X]-10,robot_hitboxes[i][Y]-20))
         elif robots[i]=="bomber":
-            if (p[0]+12)>robot_hitboxes[i][0]+30:
-                screen.blit(robot_pics[2][int(robot_counter)],(robot_hitboxes[i][0]-10,robot_hitboxes[i][1]-20))
+            if (p[X]+12)>robot_hitboxes[i][X]+30:
+                screen.blit(robot_pics[2][int(robot_counter)],(robot_hitboxes[i][X]-10,robot_hitboxes[i][Y]-20))
             else:
-                screen.blit(robot_pics[3][int(robot_counter)],(robot_hitboxes[i][0]-10,robot_hitboxes[i][1]-20))
+                screen.blit(robot_pics[3][int(robot_counter)],(robot_hitboxes[i][X]-10,robot_hitboxes[i][Y]-20))
+        elif robots[i]=="laser":
+            if (p[X]+12)>robot_hitboxes[i][X]+30:
+                screen.blit(robot_pics[6][int(robot_counter)],(robot_hitboxes[i][X]-10,robot_hitboxes[i][Y]-20))
+            else:
+                screen.blit(robot_pics[7][int(robot_counter)],(robot_hitboxes[i][X]-10,robot_hitboxes[i][Y]-20))
     return robot_counter
 
 def drawScene():
-    screen.fill(BLUE)
+    screen.fill(bg_colour)
+    if level<20:
+        level_surface=levelFont.render(str(level),True,(200,200,200))
+    else:
+        level_surface=levelFont.render("∞",True,(200,200,200))
+    screen.blit(level_surface,(575-level_surface.get_width()//2,350-level_surface.get_height()//2))
     for plat in rect_list:
         screen.blit(block,plat)
     for b in bullets:
         draw.circle(screen,GREEN,(int(b[0]),int(b[1])),4)
-    if move_list[atckHitbox]:
-        draw.rect(screen,RED,move_list[atckHitbox],1)
     row=p_list[0]
     col=int(p_list[1])
     pic=player_pics[row][col]
-    screen.blit(pic,(p[0]-17,p[1]))
+    screen.blit(pic,(p[X]-17,p[Y]))
 
-def hitWalls(x,y,walls):
+def hitWalls(x,y,walls): #this function credited to Mr Macanovik
     playerRect=Rect(x,y,40,75)
     return playerRect.collidelist(walls)!=-1
 
 def newLevel(level):
-    global begin
+    global begin,bg_colour
     begin=True
-    level+=1
+    if level<20:
+        level+=1
     robots.clear()
     robot_hitboxes.clear()
     rect_list.clear()
     rect_list.append(Rect(0,500,50,50))
+    blocks[0]=blocks[1]-len(rect_list)
     robot_timers.clear()
+    bg_colour=(randint(50,205),randint(50,205),randint(50,205))
     for i in range(level):
         robots.append(choice(possibleRobots))
         generatePlatform()
         robot_timers.append(time.get_ticks())
     return level
 
-def movePlayer(p,move_list):
+def movePlayer(p,move_list): #this function credited to Mr Macanovik
     global level
     keys=key.get_pressed()
     v[X]=0
@@ -252,14 +289,14 @@ def movePlayer(p,move_list):
         else:
             p_list[0]=5
     if keys[K_LSHIFT]:
-        move_list[img_speed]=0.2
+        move_list[img_speed]=0.4
         if move_list[facing]=="right":
             if p_list[1]>=4:
-                move_list[atckHitbox]=Rect(p[0]+30,p[1],30,75)
+                move_list[atckHitbox]=Rect(p[X]+30,p[Y],30,75)
             p_list[0]=6
         else:
             if p_list[1]>=4:
-                move_list[atckHitbox]=Rect(p[0]-25,p[1],30,75)
+                move_list[atckHitbox]=Rect(p[X]-25,p[Y],30,75)
             p_list[0]=7
 
     p_list[1]=(p_list[1]+move_list[img_speed])%len(player_pics[p_list[0]])
@@ -269,25 +306,21 @@ def movePlayer(p,move_list):
         v[Y]+=gravity
     
     #phasing through the sides
-    if p[0]+p[W]<0:
-        p[0]=1150+p[0]+p[W]
-    elif p[0]>1150:
+    if p[X]+p[W]<0:
+        p[X]=1150+p[X]+p[W]
+    elif p[X]>1150:
         if not robots:
             level=newLevel(level)
         else:
-            p[0]=0-p[W]+p[0]-1150          
-    
-def check(p):
-    current=time.get_ticks()
+            p[X]=0-p[W]+p[X]-1150
+
+def check(p): #this function credited to Mr Macanovik
     for plat in rect_list:
         if p[X]+p[W]>plat[X] and p[X]<plat[X]+plat[W] and p[Y]+p[H]<=plat[Y] and p[Y]+p[H]+v[Y]>=plat[Y]:
             v[Y]=0
             v[2]=plat[Y]
             p[Y]=plat[Y]-p[H]
     p[Y]+=int(v[Y])
-
-for img in lavaImgs:
-    img.set_colorkey(BLACK)
 
 def gaps(x1,y1,x2,y2,map,action):
     gap=[]
@@ -328,7 +361,7 @@ def drawMap(x1,y1,x2,y2,map,blocks):
     if abs(x1-x2)>50 or abs(y1-y2)>50:
         for block in gaps(x1,y1,x2,y2,map,"fill"):
             if blocks[0]>0:
-                blocks[0]=blocks[1]-len(rect_list)
+                blocks[0]=blocks[1]-len(map)
                 map.append(block)
                 new_blocks_drawn.append(block)
     else:
@@ -336,7 +369,7 @@ def drawMap(x1,y1,x2,y2,map,blocks):
         if drawRect not in map and blocks[0]>0:
             map.append(drawRect)
             new_blocks_drawn.append(drawRect)
-            blocks[0]=blocks[1]-len(rect_list)
+            blocks[0]=blocks[1]-len(map)
     cleanMap(new_blocks_drawn,map)
 
 def eraseMap(x1,y1,x2,y2,map,blocks):
@@ -359,6 +392,7 @@ while running:
         if evt.type==KEYDOWN:
             if evt.key==K_w or evt.key==K_LSHIFT:
                 p_list[1]=0
+
     mx,my=mouse.get_pos()
     mb=mouse.get_pressed()
     
@@ -367,19 +401,19 @@ while running:
     
     elif mb[2]:
         eraseMap(roundIt(omx,50),roundIt(omy,50),roundIt(mx,50),roundIt(my,50),rect_list,blocks)
-    
+
     drawScene()
     draw.rect(screen,(220,70,40),lava_background)
     lava_counter=animate(lavaImgs,lava_counter,0.1,0,580)
-    block_count=comicFont.render(str(blocks[0]),True,BLACK)
-    screen.blit(block_count,(50,550))
+    robot_counter=robotsFunction(robot_counter)
+    robotDeath(robot_hitboxes,robots,robot_timers,poof_list)
     movePlayer(p,move_list)
+    screen.blit(block_count_icon,(20,610))
+    block_count=blockFont.render(str(blocks[0]),True,BLUE)
+    screen.blit(block_count,(100,610))
     check(p)
-    robot_counter=robots_function(robot_counter)
-    robotDeath(robot_hitboxes,robots,robot_timers)
-    print(blocks[0])
+    checkDeath()
     myClock.tick(60)
-    print(robots)
     display.update()
     omx,omy=mx,my
 quit()
