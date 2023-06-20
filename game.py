@@ -51,7 +51,7 @@ objects=[lava_background,p] #the objects you cant draw on
 bullets=[] #bullets 2d list. includes a list for each bullet with x,y,vx,vy
 
 #level and block variables
-level=10
+level=1
 blocks=[15,15] #the 2nd one is your maximum amount of blocks you can place and your first one is the amount of blocks you have with you minus the ones you have placed.
 blockFont=font.SysFont("Comic Sans MS",40) #fonts for block and level
 levelFont=font.SysFont("Arial",250)
