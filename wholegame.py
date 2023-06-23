@@ -1,4 +1,3 @@
-#BLOCKS!!!!!!!!!!!!!!!!
 from pygame import * #importing modules
 from math import *
 from random import *
@@ -17,8 +16,60 @@ YELLOW=(255,255,0)
 WHITE=(255,255,255)
 PURPLE=(102,0,255)
 myClock=time.Clock()
+score=[0,0] #first one is the score, second one is the number of robot kills. every robot you kill, your score gets added by your level number. ex. level1: each robot is 1 point. level 17: each robot is worth 17 points. It maxes out at level 20, which is considered the "infinite level", because the maximum number of everything happens in level 20 and after level 20.
+
+def gameOver():
+    """this is a page that you get after dying. it shows 2 buttons: main menu and play again. You can click any two of the buttons and it will either go to main menu or restart the game. It will also display your final score and total kills."""
+    running=True
+    buttons=[Rect(450,400+y*100,250,75) for y in range(2)]
+    endFont=font.SysFont("Comic Sans MS",40)
+    file=open("highscore.txt","r")
+    database=file.readlines()
+    file=open("highscore.txt","w")
+    if len(database)<5:
+        database.append(f"Score,{score[0]},kills,{score[1]}\n")
+        for line in database:
+            file.write(line)
+    else:
+        for line in database:
+            info=line.split(",")
+            if info[1]<score[0]:
+                database[database.index(line)]=f"Score,{score[0]},kills,{score[1]}\n"
+                break
+        for line in database:
+            file.write(line)
+    file.close()
+    while running:
+        screen.fill((0,247,255))
+        for evt in event.get():
+            if evt.type==QUIT:
+                return "exit"
+            if evt.type==MOUSEBUTTONDOWN:
+                if evt.button==1:
+                    if buttons[0].collidepoint(mx,my):
+                        return "play"
+                    if buttons[1].collidepoint(mx,my):
+                        return "menu"
+        mx,my=mouse.get_pos()
+        mb=mouse.get_pressed()
+        for b in buttons:
+            draw.rect(screen,BLUE,b)
+            if b.collidepoint(mx,my):
+                draw.rect(screen,WHITE,b,5)
+        deathSurf=endFont.render(f"You Died!",True,RED)
+        scoreSurf=endFont.render(f"Final Score: {score[0]}",True,RED)
+        killsSurf=endFont.render(f"Total Kills: {score[1]}",True,RED)
+        screen.blit(deathSurf,(460,100))
+        screen.blit(scoreSurf,(450,140))
+        screen.blit(killsSurf,(450,180))
+        playSurf=endFont.render("Play",True,RED)
+        menuSurf=endFont.render("Menu",True,RED)
+        screen.blit(playSurf,(buttons[0][0]+60,buttons[0][1]))
+        screen.blit(menuSurf,(buttons[1][0]+60,buttons[1][1]))
+        display.flip()
 
 def menu():
+    """this is the menu which shows the thumbnail of the game and shows three buttons: play, instructions, and recent scores. you can click any and go to that page."""
     running=True
     menu_img=image.load("menu_img.png")
     menu_img=transform.scale(menu_img,(1150,697)).convert()
@@ -44,6 +95,7 @@ def menu():
         display.flip()
 
 def instructions():
+    """this is the instructions page you get to after clicking instructions. it has a back button going to main menu, and it blits an image of instructions that i made."""
     running=True
     instructions_img=image.load("instructions.png").convert()
     backButton=Rect(1070,620,50,50)
@@ -65,6 +117,7 @@ def instructions():
         display.flip()
 
 def recentScores():
+    """this is a page that you get after you click the button on main menu. it shows the last 5 recent scores on a blue background and has a back button. it returns to menu if you click back button"""
     running=True
     backButton=Rect(1070,620,50,50)
     back_img=image.load("back_button.png")
@@ -89,7 +142,6 @@ def play():
     bg_colour=(randint(50,205),randint(50,205),randint(50,205)) #bg colour random
     omx,omy=0,0 #old mouse x mouse y
     rect_list=[Rect(0,500,50,50)] #list of all the blocks (rects) player places
-    score=[0,0] #first one is the number of robot kills, second one is the score. every robot you kill, your score gets added by your level number. ex. level1: each robot is 1 point. level 17: each robot is worth 17 points
 
     #Image paths, counters, and image variables
     lava_counter,robot_counter=0,0
@@ -132,7 +184,7 @@ def play():
     blocks=[15,15] #the 2nd one is your maximum amount of blocks you can place and your first one is the amount of blocks you have with you minus the ones you have placed.
     blockFont=font.SysFont("Comic Sans MS",40) #fonts for block, level, and scores
     levelFont=font.SysFont("Arial",250)
-    scoresFont=font.SysFont("Comic Sans MS",20)
+    scoresFont=font.SysFont("Arial",25)
 
     def flipPics(lst):
         """this funcion takes in a list of imgs and flips them horizontally"""
@@ -182,8 +234,9 @@ def play():
     poof_list=[]
 
     def checkDeath():
-        if p[Y]>=600 or blocks[1]==0:
-            return "a"
+        global running
+        if p[Y]>=600 or blocks[1]<=0:
+            running=False
 
     def roundIt(num,round_num):
         """this function takes in a number and a round number and then rounds that number down to the nearest round number (ex roundIt(127,20) -> 120). This is for the square grid of the game"""
@@ -255,7 +308,7 @@ def play():
                 del bullets[p.collidelist(bulletRects)]
 
     def robotDeath(hitboxes,robots,timers,poof,game_score):
-        """this function deals with when robots are killed"""
+        """this function deals with when robots are killed. it checks if the player colllided with the robot hitbox list. if so, it deletes the robot from all the related lists. you also get blocks."""
         global level,begin_timer,begin
         if move_list[atckHitbox]:
             index=move_list[atckHitbox].collidelist(hitboxes)
@@ -266,12 +319,12 @@ def play():
                 del robots[index]
                 del timers[index]
                 del robotDelays[index]
-                blocks[1]+=15
+                blocks[1]+=5
                 blocks[0]=blocks[1]-len(rect_list)
                 game_score[0]+=level
                 game_score[1]+=1
 
-        if not robots:
+        if not robots: #if all robots are dead, there is a timer that goes for 60 seconds which automatically spawns you to the next level after 60 seconds.
             bullets.clear()
             if begin:
                 begin_timer=time.get_ticks()
@@ -282,7 +335,7 @@ def play():
                 p[Y]=425
                 level=newLevel(level)
 
-        for i in range(len(poof)):
+        for i in range(len(poof)): #this is the poof animation for each killed robot
             if poof[i]:
                 if poof[i][2]<7:
                     poof[i][2]+=0.3
@@ -293,6 +346,7 @@ def play():
                     break
         
     def robotsFunction(robot_counter):
+        """this function is the main robots function. it blits a different animation image for each robot in robots list (there is a facing left and right) and calls each functions for each robot in robots list."""
         robot_counter=(robot_counter+0.2)%7
         for i in range(len(robots)):
             screen.blit(robot_platform,(robot_hitboxes[i][X]-25,robot_hitboxes[i][Y]+50))
@@ -321,6 +375,7 @@ def play():
         return robot_counter
 
     def drawScene():
+        """this function draws the scene of the game. it draws the level number, the screen fill, the map, the player animations, and the bullets."""
         screen.fill(bg_colour)
         if level<20:
             level_surface=levelFont.render(str(level),True,(200,200,200))
@@ -337,10 +392,12 @@ def play():
         screen.blit(pic,(p[X]-17,p[Y]))
 
     def hitWalls(x,y,walls): #this function credited to Mr Macanovik
+        """this function  checks if the player hit the map so the player doesnt phase through the map."""
         playerRect=Rect(x,y,40,75)
         return playerRect.collidelist(walls)!=-1
 
     def newLevel(level):
+        """this function is called when a new level needs to be created. all the robot related lists are cleared, the map is cleared (so your blocks can be transferred to the next level), and new robots are generated based no the number of the level."""
         global begin,bg_colour
         begin=True
         if level<20:
@@ -363,6 +420,7 @@ def play():
         return level
 
     def movePlayer(p,move_list): #this function credited to Mr Macanovik
+        """this function moves the player and deals with a variable (list) that controls player animation. the player can move left and right (without phasing through the map) and can jump in this function. Also, the player attacking mechanicsm is in this function. (If player clicks shift, an attack hitbox shows up beside the player)."""
         global level
         keys=key.get_pressed()
         v[X]=0
@@ -384,7 +442,7 @@ def play():
             if v[Y]==0:
                 p_list[0]=2
                 move_list[img_speed]=0.15
-        if p[Y]+p[H]==v[2] and v[Y]==0:
+        if p[Y]+p[H]==v[2] and v[Y]==0: #jumping mechanism. (double jump also present)
             move_list[dJump]="first jump"
         if keys[K_w] and p[Y]+p[H]==v[2] and v[Y]==0:
             v[Y]=jumpPower
@@ -401,7 +459,7 @@ def play():
                 p_list[0]=4
             else:
                 p_list[0]=5
-        if keys[K_LSHIFT]:
+        if keys[K_LSHIFT]: #attacking
             move_list[img_speed]=0.4
             if move_list[facing]=="right":
                 if p_list[1]>=4:
@@ -411,9 +469,11 @@ def play():
                 if p_list[1]>=4:
                     move_list[atckHitbox]=Rect(p[X]-25,p[Y],30,75)
                 p_list[0]=7
-
+        
+        #player animations
         p_list[1]=(p_list[1]+move_list[img_speed])%len(player_pics[p_list[0]])
-
+        
+        #movement velocity
         p[X]+=v[X]
         if v[Y]<=100:
             v[Y]+=gravity
@@ -428,6 +488,7 @@ def play():
                 p[X]=0-p[W]+p[X]-1150
 
     def check(p): #this function credited to Mr Macanovik
+        """this function checks if a player landed on the map. if they did, it stops the player from going straight through the map by stopping their velocity"""
         for plat in rect_list:
             if p[X]+p[W]>plat[X] and p[X]<plat[X]+plat[W] and p[Y]+p[H]<=plat[Y] and p[Y]+p[H]+v[Y]>=plat[Y]:
                 v[Y]=0
@@ -436,6 +497,7 @@ def play():
         p[Y]+=int(v[Y])
 
     def gaps(x1,y1,x2,y2,map,action):
+        """this function fills the gaps when the player draws rectangles using slops and pythagorean theorem. there is an action parameter that determines whether the player will be drawing or erasing, but the gaps works for both actions."""
         gap=[]
         dst=sqrt((x2-x1)**2+(y2-y1)**2)
         dx,dy=x2-x1,y2-y1
@@ -465,11 +527,13 @@ def play():
             return map
 
     def cleanMap(new_blocks_drawn,map):
+        """this function makes sure the player doesnt draw on certain objects like itself, the robots, and the lava. if there are blocks on these objects, they are removed from the list."""
         for block in new_blocks_drawn:
             if block.collidelist(objects)!=-1:
                 map.remove(block)
 
     def drawMap(x1,y1,x2,y2,map,blocks):
+        """this is the function where the player draws the map. either they draw it slowly and a rect is appended to the map for where their mouse is at, or they draw it fast which requires the gap fill function."""
         new_blocks_drawn=[]
         if abs(x1-x2)>50 or abs(y1-y2)>50:
             for block in gaps(x1,y1,x2,y2,map,"fill"):
@@ -486,6 +550,7 @@ def play():
         cleanMap(new_blocks_drawn,map)
 
     def eraseMap(x1,y1,x2,y2,map,blocks):
+        """this function is for erasing the map, which also includes drawing quickly and slowly just like the drawMap function."""
         if abs(x1-x2)>50 or abs(y1-y2)>50:
             map=gaps(x1,y1,x2,y2,map,"erase")
         else:
@@ -495,11 +560,11 @@ def play():
         blocks[0]=blocks[1]-len(map)
 
     def animate(lst,counter,speed,x,y):
+        """this is an animation function that takes in a list of images and blits the image at the counter. It added a certain amount to the counter every time (speed parameter) and returns the counter to be updated."""
         screen.blit(lst[int(counter)],(x,y))
         return (counter+speed)%len(lst)
 
-    while running:
-        print(score[0],score[1])
+    while running: #this is the while running loop where all the functions are called
         for evt in event.get():
             if evt.type==QUIT:
                 return "exit"
@@ -527,13 +592,19 @@ def play():
         screen.blit(block_count_icon,(20,610))
         block_count=blockFont.render(str(blocks[0]),True,BLUE)
         screen.blit(block_count,(100,610))
+        scoreSurf=scoresFont.render(f"Score: {score[0]}",True,BLACK)
+        killsSurf=scoresFont.render(f"Kills: {score[1]}",True,BLACK)
         screen.blit(menu_icon,menuButton)
+        screen.blit(scoreSurf,(5,5))
+        screen.blit(killsSurf,(1075,5))
         check(p)
         checkDeath()
         myClock.tick(60)
         display.update()
         omx,omy=mx,my
+    return "game over"
 
+#This is the menu system. There is a page variable that controls where we are at the menu and calls a different function based on what it is. (if page = play, the play function is called which is the game.)
 page="menu"
 while page!="exit":
     if page=="menu":
@@ -544,4 +615,6 @@ while page!="exit":
         page=instructions()
     if page=="recent scores":
         page=recentScores()
+    if page=="game over":
+        page=gameOver()
 quit()
