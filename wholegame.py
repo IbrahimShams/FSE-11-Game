@@ -20,25 +20,10 @@ score=[0,0] #first one is the score, second one is the number of robot kills. ev
 
 def gameOver():
     """this is a page that you get after dying. it shows 2 buttons: main menu and play again. You can click any two of the buttons and it will either go to main menu or restart the game. It will also display your final score and total kills."""
+    global score
     running=True
     buttons=[Rect(450,400+y*100,250,75) for y in range(2)]
     endFont=font.SysFont("Comic Sans MS",40)
-    file=open("highscore.txt","r")
-    database=file.readlines()
-    file=open("highscore.txt","w")
-    if len(database)<5:
-        database.append(f"Score,{score[0]},kills,{score[1]}\n")
-        for line in database:
-            file.write(line)
-    else:
-        for line in database:
-            info=line.split(",")
-            if info[1]<score[0]:
-                database[database.index(line)]=f"Score,{score[0]},kills,{score[1]}\n"
-                break
-        for line in database:
-            file.write(line)
-    file.close()
     while running:
         screen.fill((0,247,255))
         for evt in event.get():
@@ -59,7 +44,7 @@ def gameOver():
         deathSurf=endFont.render(f"You Died!",True,RED)
         scoreSurf=endFont.render(f"Final Score: {score[0]}",True,RED)
         killsSurf=endFont.render(f"Total Kills: {score[1]}",True,RED)
-        screen.blit(deathSurf,(460,100))
+        screen.blit(deathSurf,(485,100))
         screen.blit(scoreSurf,(450,140))
         screen.blit(killsSurf,(450,180))
         playSurf=endFont.render("Play",True,RED)
@@ -137,11 +122,13 @@ def recentScores():
         display.flip()
 
 def play():
-    global level,begin_timer,begin,bg_colour,running
+    global level,begin_timer,begin,bg_colour,running,score
+    #general variables
     running=True
     bg_colour=(randint(50,205),randint(50,205),randint(50,205)) #bg colour random
     omx,omy=0,0 #old mouse x mouse y
     rect_list=[Rect(0,500,50,50)] #list of all the blocks (rects) player places
+    score=[0,0]
 
     #Image paths, counters, and image variables
     lava_counter,robot_counter=0,0
@@ -391,7 +378,7 @@ def play():
         pic=player_pics[row][col]
         screen.blit(pic,(p[X]-17,p[Y]))
 
-    def hitWalls(x,y,walls): #this function credited to Mr Macanovik
+    def hitWalls(x,y,walls):
         """this function  checks if the player hit the map so the player doesnt phase through the map."""
         playerRect=Rect(x,y,40,75)
         return playerRect.collidelist(walls)!=-1
@@ -419,7 +406,7 @@ def play():
             robot_timers.append(time.get_ticks())
         return level
 
-    def movePlayer(p,move_list): #this function credited to Mr Macanovik
+    def movePlayer(p,move_list):
         """this function moves the player and deals with a variable (list) that controls player animation. the player can move left and right (without phasing through the map) and can jump in this function. Also, the player attacking mechanicsm is in this function. (If player clicks shift, an attack hitbox shows up beside the player)."""
         global level
         keys=key.get_pressed()
@@ -487,7 +474,7 @@ def play():
             else:
                 p[X]=0-p[W]+p[X]-1150
 
-    def check(p): #this function credited to Mr Macanovik
+    def check(p):
         """this function checks if a player landed on the map. if they did, it stops the player from going straight through the map by stopping their velocity"""
         for plat in rect_list:
             if p[X]+p[W]>plat[X] and p[X]<plat[X]+plat[W] and p[Y]+p[H]<=plat[Y] and p[Y]+p[H]+v[Y]>=plat[Y]:
