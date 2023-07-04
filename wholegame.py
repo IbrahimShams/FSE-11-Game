@@ -1,4 +1,4 @@
-#block count problem, score resetting problem
+#bullet list issues
 from pygame import * #importing modules
 from math import *
 from random import *
@@ -19,7 +19,7 @@ PURPLE=(102,0,255)
 myClock=time.Clock()
 score1=[0,0] #first one is the score, second one is the number of robot kills. every robot you kill, your score gets added by your level number. ex. level1: each robot is 1 point. level 17: each robot is worth 17 points. It maxes out at level 20, which is considered the "infinite level", because the maximum number of everything happens in level 20 and after level 20.
 
-def gameOver():
+def gameOver(score):
     """this is a page that you get after dying. it shows 2 buttons: main menu and play again. You can click any two of the buttons and it will either go to main menu or restart the game. It will also display your final score and total kills."""
     running=True
     buttons=[Rect(450,400+y*100,250,75) for y in range(2)]
@@ -31,6 +31,8 @@ def gameOver():
                 return "exit"
             if evt.type==MOUSEBUTTONDOWN:
                 if evt.button==1:
+                    score[0]=0
+                    score[1]=0
                     if buttons[0].collidepoint(mx,my):
                         return "play"
                     if buttons[1].collidepoint(mx,my):
@@ -219,7 +221,7 @@ def play(score):
     poof_list=[]
 
     def patchBlocks():
-        if len(rect_list)>blocks[1]:
+        if blocks[0]<0:
             blocks[0]=0
 
     def checkDeath():
@@ -289,13 +291,16 @@ def play(score):
             bulletRects[bullet_idx][X]+=b[2]
             bulletRects[bullet_idx][Y]+=b[3]
             if bulletRects[bullet_idx].collidelist(rect_list)!=-1:
+                del rect_list[bulletRects[bullet_idx].collidelist(rect_list)]
                 del bulletRects[bullet_idx]
                 bullets.remove(b)
+                blocks[1]-=1
+                blocks[0]=blocks[1]-len(rect_list)
             elif b[X]>1150 or b[X]+2<0 or b[Y]+2<0 or b[Y]>697:
                 del bulletRects[bullets.index(b)]
                 bullets.remove(b)
             elif p.collidelist(bulletRects)!=-1:
-                blocks[1]-=5
+                blocks[1]-=3
                 blocks[0]=blocks[1]-len(rect_list)
                 idx=p.collidelist(bulletRects)
                 del bulletRects[idx]
@@ -576,7 +581,8 @@ def play(score):
             
         elif mb[0]:
             eraseMap(roundIt(omx,50),roundIt(omy,50),roundIt(mx,50),roundIt(my,50),rect_list,blocks)
-
+        
+        patchBlocks()
         drawScene()
         draw.rect(screen,(220,70,40),lava_background)
         lava_counter=animate(lavaImgs,lava_counter,0.1,0,580)
@@ -593,7 +599,6 @@ def play(score):
         screen.blit(killsSurf,(1075,5))
         check(p)
         checkDeath()
-        patchBlocks()
         myClock.tick(60)
         display.update()
         omx,omy=mx,my
@@ -611,5 +616,5 @@ while page!="exit":
     if page=="recent scores":
         page=recentScores()
     if page=="game over":
-        page=gameOver()
+        page=gameOver(score1)
 quit()
