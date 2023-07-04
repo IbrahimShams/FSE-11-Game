@@ -1,3 +1,4 @@
+#block count problem, score resetting problem
 from pygame import * #importing modules
 from math import *
 from random import *
@@ -16,11 +17,10 @@ YELLOW=(255,255,0)
 WHITE=(255,255,255)
 PURPLE=(102,0,255)
 myClock=time.Clock()
-score=[0,0] #first one is the score, second one is the number of robot kills. every robot you kill, your score gets added by your level number. ex. level1: each robot is 1 point. level 17: each robot is worth 17 points. It maxes out at level 20, which is considered the "infinite level", because the maximum number of everything happens in level 20 and after level 20.
+score1=[0,0] #first one is the score, second one is the number of robot kills. every robot you kill, your score gets added by your level number. ex. level1: each robot is 1 point. level 17: each robot is worth 17 points. It maxes out at level 20, which is considered the "infinite level", because the maximum number of everything happens in level 20 and after level 20.
 
 def gameOver():
     """this is a page that you get after dying. it shows 2 buttons: main menu and play again. You can click any two of the buttons and it will either go to main menu or restart the game. It will also display your final score and total kills."""
-    global score
     running=True
     buttons=[Rect(450,400+y*100,250,75) for y in range(2)]
     endFont=font.SysFont("Comic Sans MS",40)
@@ -42,8 +42,8 @@ def gameOver():
             if b.collidepoint(mx,my):
                 draw.rect(screen,WHITE,b,5)
         deathSurf=endFont.render(f"You Died!",True,RED)
-        scoreSurf=endFont.render(f"Final Score: {score[0]}",True,RED)
-        killsSurf=endFont.render(f"Total Kills: {score[1]}",True,RED)
+        scoreSurf=endFont.render(f"Final Score: {score1[0]}",True,RED)
+        killsSurf=endFont.render(f"Total Kills: {score1[1]}",True,RED)
         screen.blit(deathSurf,(485,100))
         screen.blit(scoreSurf,(450,140))
         screen.blit(killsSurf,(450,180))
@@ -121,14 +121,13 @@ def recentScores():
                 return "menu"
         display.flip()
 
-def play():
-    global level,begin_timer,begin,bg_colour,running,score
+def play(score):
+    global level,begin_timer,begin,bg_colour,running
     #general variables
     running=True
     bg_colour=(randint(50,205),randint(50,205),randint(50,205)) #bg colour random
     omx,omy=0,0 #old mouse x mouse y
     rect_list=[Rect(0,500,50,50)] #list of all the blocks (rects) player places
-    score=[0,0]
 
     #Image paths, counters, and image variables
     lava_counter,robot_counter=0,0
@@ -143,7 +142,7 @@ def play():
     spike.set_colorkey(WHITE)
     menuButton=Rect(1050,620,48,33)
     lavaImgs=[image.load("lava/lava00"+f"{i}"+".png").convert() for i in range(6)]
-    lava_background=Rect(0,597,1150,100)
+    lava_background=Rect(0,625,1150,72)
     for img in lavaImgs:
         img.set_colorkey(BLACK)
 
@@ -156,7 +155,6 @@ def play():
     v=[0,0,697] #X,Y velocity for player
     p=Rect(0,300,40,75) #player hitbox rect
     p_list=[0,0] #player animation list (row, column for 2d list of animations. row for action, column for frame)
-
     #robot variables
     SPEED=8 #speed of bullet
     begin_timer=False #timing robot
@@ -220,6 +218,10 @@ def play():
     poof_pics=addPics("poof","tile",0,7)
     poof_list=[]
 
+    def patchBlocks():
+        if len(rect_list)>blocks[1]:
+            blocks[0]=0
+
     def checkDeath():
         global running
         if p[Y]>=600 or blocks[1]<=0:
@@ -267,11 +269,11 @@ def play():
 
     def shoot(x1,y1,x2,y2):
         """this function is called when the shooter robot shoots. it calculates the angle using trig to aim at the player and then append the x,y,vx,vy to the bullets list. there is a bulletRects list that is simply a copy paste of the bullets list but with rectangles to check if the bullet hit the player"""
-        ang=atan2(y2-y1,x2-x1)
+        ang=atan2(y2-y1+38,x2-x1+12)
         vx=cos(ang)*SPEED
         vy=sin(ang)*SPEED
         bullets.append([x1,y1,vx,vy])
-        bulletRects.append(Rect(x1,y1,25,25))
+        bulletRects.append(Rect(x1,y1,2,2))
 
     def shooterRobot(start,waiting_lst,pos,x1,y1,x2,y2):
         """this function is similar in structure to all the othe robot functions. it has a timer system, when timer goes off, it takes the fixed x,y of the player and called shoot(). Then, it makes each bullet in the bullet list move by adding vx and vy to the x and y. it checks if the bullet hit the player or went off the screen and removes the bullet in that case"""
@@ -283,16 +285,21 @@ def play():
         for b in bullets[:]:
             b[X]+=b[2]
             b[Y]+=b[3]
-            bulletRects[bullets.index(b)][X]+=b[2]
-            bulletRects[bullets.index(b)][Y]+=b[3]
-            if b[X]>1150 or b[X]+25<0 or b[Y]+25<0 or b[Y]>697:
+            bullet_idx=bullets.index(b)
+            bulletRects[bullet_idx][X]+=b[2]
+            bulletRects[bullet_idx][Y]+=b[3]
+            if bulletRects[bullet_idx].collidelist(rect_list)!=-1:
+                del bulletRects[bullet_idx]
+                bullets.remove(b)
+            elif b[X]>1150 or b[X]+2<0 or b[Y]+2<0 or b[Y]>697:
                 del bulletRects[bullets.index(b)]
                 bullets.remove(b)
             elif p.collidelist(bulletRects)!=-1:
                 blocks[1]-=5
                 blocks[0]=blocks[1]-len(rect_list)
-                del bulletRects[p.collidelist(bulletRects)]
-                del bullets[p.collidelist(bulletRects)]
+                idx=p.collidelist(bulletRects)
+                del bulletRects[idx]
+                del bullets[idx]
 
     def robotDeath(hitboxes,robots,timers,poof,game_score):
         """this function deals with when robots are killed. it checks if the player colllided with the robot hitbox list. if so, it deletes the robot from all the related lists. you also get blocks."""
@@ -372,7 +379,7 @@ def play():
         for plat in rect_list:
             screen.blit(block,plat)
         for b in bulletRects:
-            screen.blit(spike,b)
+            screen.blit(spike,(b[0]-12,b[1]-12))
         row=p_list[0]
         col=int(p_list[1])
         pic=player_pics[row][col]
@@ -431,11 +438,11 @@ def play():
                 move_list[img_speed]=0.15
         if p[Y]+p[H]==v[2] and v[Y]==0: #jumping mechanism. (double jump also present)
             move_list[dJump]="first jump"
-        if keys[K_w] and p[Y]+p[H]==v[2] and v[Y]==0:
+        if keys[K_SPACE] and p[Y]+p[H]==v[2] and v[Y]==0:
             v[Y]=jumpPower
-        if not keys[K_w] and move_list[dJump]=="first jump":
+        if not keys[K_SPACE] and move_list[dJump]=="first jump":
             move_list[dJump]="double jump available"
-        if move_list[dJump]=="double jump available" and keys[K_w]:
+        if move_list[dJump]=="double jump available" and keys[K_SPACE]:
             v[Y]=jumpPower
             move_list[dJump]="no jump"
         if v[Y]<0:
@@ -446,7 +453,7 @@ def play():
                 p_list[0]=4
             else:
                 p_list[0]=5
-        if keys[K_LSHIFT]: #attacking
+        if keys[K_r]: #attacking
             move_list[img_speed]=0.4
             if move_list[facing]=="right":
                 if p_list[1]>=4:
@@ -556,7 +563,7 @@ def play():
             if evt.type==QUIT:
                 return "exit"
             if evt.type==KEYDOWN:
-                if evt.key==K_w or evt.key==K_LSHIFT:
+                if evt.key==K_SPACE or evt.key==K_r:
                     p_list[1]=0
             if evt.type==MOUSEBUTTONDOWN:
                 if evt.button==1 and menuButton.collidepoint(mx,my):
@@ -564,10 +571,10 @@ def play():
         mx,my=mouse.get_pos()
         mb=mouse.get_pressed()
         
-        if mb[0]:
+        if mb[2]:
             drawMap(roundIt(omx,50),roundIt(omy,50),roundIt(mx,50),roundIt(my,50),rect_list,blocks)
             
-        elif mb[2]:
+        elif mb[0]:
             eraseMap(roundIt(omx,50),roundIt(omy,50),roundIt(mx,50),roundIt(my,50),rect_list,blocks)
 
         drawScene()
@@ -586,6 +593,7 @@ def play():
         screen.blit(killsSurf,(1075,5))
         check(p)
         checkDeath()
+        patchBlocks()
         myClock.tick(60)
         display.update()
         omx,omy=mx,my
@@ -597,7 +605,7 @@ while page!="exit":
     if page=="menu":
         page=menu()
     if page=="play":
-        page=play()
+        page=play(score1)
     if page=="instructions":
         page=instructions()
     if page=="recent scores":
